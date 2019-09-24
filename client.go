@@ -26,22 +26,6 @@ type XFunc struct {
 	Done          chan *XFunc // Strobes when call is complete.
 }
 
-// A ClientCodec implements writing of RPC requests and
-// reading of RPC responses for the client side of an RPC session.
-// The client calls WriteRequest to write a request to the connection
-// and calls ReadResponseHeader and ReadResponseBody in pairs
-// to read responses. The client calls Close when finished with the
-// connection. ReadResponseBody may be called with a nil
-// argument to force the body of the response to be read and then
-// discarded.
-// See NewClient's comment for information about concurrent access.
-type ClientCodec interface {
-	WriteRequest(*orpc.Request, interface{}) error
-	ReadResponseHeader(*orpc.Response) error
-	ReadResponseBody(interface{}) error
-
-	Close() error
-}
 
 //NewClient 建立客户端
 func NewClient(network, address string) (*XClient, error) {
@@ -60,105 +44,49 @@ func NewClient(network, address string) (*XClient, error) {
 		return nil, err
 	}
 
+
+	//这里需要考虑一下分层
+	//第一层是链接层，向外暴露接口
+	//NEW()
+	//Call():普通 Client / Server 调用(北向)接口
+	//C2S():Client 向 Server 的流式(北向)流式接口
+	//S2C():Server 向 Cinet 调用(南向)流式接口
+	//C2C():Server / Client 双向流式接口
+	//SetFunc():保存方法及参数
+	
 	session, _ := yamux.Client(conn, nil)
 
-	x := NewClientWithCodec{}
-	x.input()
+
+
+	x := &XClient{session: session}
+
 
 	return x, nil
 }
 
-// NewClientWithCodec is like NewClient but uses the specified
-// codec to encode requests and decode responses.
-func NewClientWithCodec(codec ClientCodec) *XClient {
-	x := &XClient{
-		codec:   codec,
-		pending: make(map[uint64]*XFunc),
-	}
-	go x.input()
-	return x
-}
-
-func (x *XClient) input() {
-	var err error
-	var response Response
-	for err == nil {
-		response = Response{}
-		err = client.codec.ReadResponseHeader(&response)
-		if err != nil {
-			break
-		}
-		seq := response.Seq
-		client.mutex.Lock()
-		call := client.pending[seq]
-		delete(client.pending, seq)
-		client.mutex.Unlock()
-
-		switch {
-		case call == nil:
-			// We've got no pending call. That usually means that
-			// WriteRequest partially failed, and call was already
-			// removed; response is a server telling us about an
-			// error reading request body. We should still attempt
-			// to read error body, but there's no one to give it to.
-			err = client.codec.ReadResponseBody(nil)
-			if err != nil {
-				err = errors.New("reading error body: " + err.Error())
-			}
-		case response.Error != "":
-			// We've got an error response. Give this to the request;
-			// any subsequent requests will get the ReadResponseBody
-			// error if there is one.
-			call.Error = ServerError(response.Error)
-			err = client.codec.ReadResponseBody(nil)
-			if err != nil {
-				err = errors.New("reading error body: " + err.Error())
-			}
-			call.done()
-		default:
-			err = client.codec.ReadResponseBody(call.Reply)
-			if err != nil {
-				call.Error = errors.New("reading body " + err.Error())
-			}
-			call.done()
-		}
-	}
-	// Terminate pending calls.
-	client.reqMutex.Lock()
-	client.mutex.Lock()
-	client.shutdown = true
-	closing := client.closing
-	if err == io.EOF {
-		if closing {
-			err = ErrShutdown
-		} else {
-			err = io.ErrUnexpectedEOF
-		}
-	}
-	for _, call := range client.pending {
-		call.Error = err
-		call.done()
-	}
-	client.mutex.Unlock()
-	client.reqMutex.Unlock()
-	if debugLog && err != io.EOF && !closing {
-		log.Println("rpc: client protocol error:", err)
-	}
-}
 
 //SetFuncMap 保存方法及参数
 func (x *XClient) SetFuncMap(xfm map[string]*XFunc) {
 
 }
 
-//Call 单次调用
+//Call 普通 Client / Server 调用(北向)接口
 func (x *XClient) Call() {
 
-	//如果我想写成grpc的那种形式怎么做比较好
+	//todo
 
 }
 
-//Stream 建立stream链接
-func (x *XClient) Stream() {
+//C2S() Client 向 Server 的流式(北向)流式接口
+func (x *XClient) C2S() {
+
+	//todo
+
+}
+
+//Call 普通 Client / Server 调用(北向)接口
+func (x *XClient) C2C() {
+
+	//todo
 
 }
