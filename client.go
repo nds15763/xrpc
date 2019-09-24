@@ -7,12 +7,14 @@ import (
 	"net"
 	oRpc "net/rpc"
 
+	reg "xrpc/register"
 	"github.com/hashicorp/yamux"
 )
 
 //XClient 客户端
 type XClient struct {
 	rpc     *oRpc.Client
+	consul *reg.Consul
 	session yamux.Session
 	funcMap map[string]*XFunc
 }
@@ -28,7 +30,7 @@ type XFunc struct {
 
 
 //NewClient 建立客户端
-func NewClient(network, address string) (*XClient, error) {
+func NewClient(consulAddr, serviceName string) (*XClient, error) {
 	//从上层开始经过 net/rpc(可能需要重写) 然后再下层传输的地方使用yamux
 
 	//所以说需要返回一个结构体，其中包含对于RPC的所有方法
@@ -36,14 +38,6 @@ func NewClient(network, address string) (*XClient, error) {
 	//如 xrpc.NewClient(xxxx)
 
 	//一堆源码，我在想舍弃他这些东西，直接调用input方法。而且input方法也只是单纯的发送用，也不涉及一些反射
-
-	//所以第一步还是建立连接
-
-	conn, err := net.Dial(network, address)
-	if err != nil {
-		return nil, err
-	}
-
 
 	//这里需要考虑一下分层
 	//第一层是链接层，向外暴露接口
@@ -54,8 +48,25 @@ func NewClient(network, address string) (*XClient, error) {
 	//C2C():Server / Client 双向流式接口
 	//SetFunc():保存方法及参数
 	
-	session, _ := yamux.Client(conn, nil)
 
+	//0.5 实例化链接是否需要先去consul中注册服务和查找
+	//注册服务应该是微服务启动时准备的，所以第一步的时候应该需要consul中的node ID
+	//
+	reg.DoDiscover(consulAddr, serviceName)
+
+	if reg.ServicsMap[serviceName] == nil{
+		return nil,err.Errors("Server Not Found")
+	}
+	
+	//1 实例化链接，先调用net/rpc建立实体链接
+	conn, err := net.Dial(network, address)
+	if err != nil {
+		return nil, err
+	}
+	//2 实例化链接之后 可能需要封装源码的调用，中间加一层yamux
+	//session, _ := yamux.Client(conn, nil)
+
+	//3 建立连接之后去注册
 
 
 	x := &XClient{session: session}

@@ -1,4 +1,4 @@
-package main
+package register
 
 import (
 	"encoding/json"
@@ -33,13 +33,13 @@ type KVData struct {
 	Timestamp int `json:"ts"`
 }
 
-var (
-	servics_map     = make(map[string]ServiceList)
-	service_locker  = new(sync.Mutex)
-	consul_client   *api.Client
-	my_service_id   string
-	my_service_name string
-	my_kv_key       string
+type Consul struct (
+	ServicsMap     = make(map[string]ServiceList)
+	serviceLocker  = new(sync.Mutex)
+	consulClient   *api.Client
+	myServiceID   string
+	myServiceName string
+	myKvKey       string
 )
 
 func CheckErr(err error) {
@@ -60,7 +60,7 @@ func StartService(addr string) {
 	CheckErr(err)
 }
 
-func main() {
+func NewConsul() *Consul{
 	var status_monitor_addr, service_name, service_ip, consul_addr, found_service string
 	var service_port int
 	flag.StringVar(&consul_addr, "consul_addr", "localhost:8500", "host:port of the service stuats monitor interface")
@@ -83,7 +83,7 @@ func main() {
 
 	go DoUpdateKeyValue(consul_addr, service_name, service_ip, service_port)
 
-	select {}
+	return &Consul{}
 }
 
 func DoRegistService(consul_addr string, monitor_addr string, service_name string, ip string, port int) {
