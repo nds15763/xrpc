@@ -50,13 +50,15 @@ func NewClient(consulAddr, serviceName string) (*XClient, error) {
 	
 
 	//0.5 实例化链接是否需要先去consul中注册服务和查找
-	//注册服务应该是微服务启动时准备的，所以第一步的时候应该需要consul中的node ID
-	//
+	//注册服务应该是微服务启动时准备的
+	//这个我要再看一下，是通过什么能直接访问到负载均衡，是consul+nginx还是怎么
+	//如果是nginx的话就需要在consul中存一个路由地址
 	reg.DoDiscover(consulAddr, serviceName)
 
 	if reg.ServicsMap[serviceName] == nil{
 		return nil,err.Errors("Server Not Found")
 	}
+	
 	
 	//1 实例化链接，先调用net/rpc建立实体链接
 	conn, err := net.Dial(network, address)
@@ -67,8 +69,6 @@ func NewClient(consulAddr, serviceName string) (*XClient, error) {
 	//session, _ := yamux.Client(conn, nil)
 
 	//3 建立连接之后去注册
-
-
 	x := &XClient{session: session}
 
 

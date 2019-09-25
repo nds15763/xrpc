@@ -20,7 +20,7 @@ func NewServer(network, address string) (XServer, error) {
 	return XServer{}, nil
 }
 
-//S2C() Server 向 Cinet 调用(南向)流式接口
+//S2C Server向Client调用(南向)流式接口
 func (x *XServer) S2C() {
 
 	//todo
